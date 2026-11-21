@@ -17,24 +17,27 @@ def webhook(request):
     # Setup
     wh_secret = settings.STRIPE_WH_SECRET
     stripe.api_key = settings.STRIPE_SECRET_KEY
-    stripe_client = stripe.StripeClient(settings.STRIPE_SECRET_KEY)
 
     # Get the webhook data and verify its signature
     payload = request.body
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
 
     try:
-        notification = stripe_client.parse_event_notification(
+        event = stripe.Webhook.construct_event(
             payload, sig_header, wh_secret
         )
 
-    except ValueError:
-        # Invalid payload
-        return HttpResponse(status=400)
+    except ValueError as e:
+        return HttpResponse(
+            content=f'Invalid payload: {e}',
+            status=400
+        )
 
-    except stripe.error.SignatureVerificationError:
-        # Invalid signature
-        return HttpResponse(status=400)
+    except stripe.SignatureVerificationError as e:
+        return HttpResponse(
+            content=f'Signature verification failed: {e}',
+            status=400
+        )
 
     except Exception as e:
         return HttpResponse(content=str(e), status=400)
@@ -42,22 +45,17 @@ def webhook(request):
     # Set up a webhook handler
     handler = StripeWH_Handler(request)
 
-    # Get the webhook type from Stripe
-    event_type = notification.type
+    event_map = {
+        'payment_intent.succeeded':
+            handler.handle_payment_intent_succeeded,
+        'payment_intent.payment_failed':
+            handler.handle_payment_intent_payment_failed,
+    }
 
-    # Map thin webhook events to relevant handler functions
-    if event_type == 'v1.payment_intent.succeeded':
-        intent = notification.fetch_related_object()
-        response = handler.handle_payment_intent_succeeded(
-            intent, event_type
-        )
+    event_type = event['type']
+    event_handler = event_map.get(
+        event_type, handler.handle_event
+    )
 
-    elif event_type == 'v1.payment_intent.payment_failed':
-        response = handler.handle_payment_intent_payment_failed(
-            event_type
-        )
-
-    else:
-        response = handler.handle_event(event_type)
-
+    response = event_handler(event)
     return response
