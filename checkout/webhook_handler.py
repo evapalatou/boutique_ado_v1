@@ -63,7 +63,7 @@ class StripeWH_Handler:
         grand_total = round(stripe_charge.amount / 100, 2)
 
         # Clean data in the shipping details
-        shipping_address = shipping_details['address']
+        shipping_address = shipping_details['address'].to_dict()
 
         for field, value in shipping_address.items():
             if value == "":
