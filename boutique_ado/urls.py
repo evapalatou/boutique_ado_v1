@@ -36,6 +36,14 @@ urlpatterns = [
             'path': 'sitemap.xml',
         }
     ),
+    path(
+        'robots.txt',
+        serve,
+        {
+            'document_root': settings.BASE_DIR,
+            'path': 'robots.txt',
+        }
+    ),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 handler404 = 'boutique_ado.views.handler404'
 
